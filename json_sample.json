@@ -1,0 +1,22 @@
+{
+	"boolq" : [
+				{ "idx" : 1, "label": 1},
+				{ "idx" : 2, "label": 0},
+				...(생략)...
+			],
+	"copa" : [
+				{ "idx" : 1, "label": 1},
+				{ "idx" : 2, "label": 2},
+				..(생략)...
+			],
+	"wic" : [
+				{ "idx" : 1, "label": true},
+				{ "idx" : 2, "label": false },
+				..(생략)...
+			],
+	"cola" : [
+				{ "idx" : 1, "label": 0},
+				{ "idx" : 1, "label": 1},
+				...(생략)...
+			]
+}
