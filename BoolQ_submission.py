@@ -1,15 +1,14 @@
 """
-python COPA_submission.py
+python BoolQ_submission.py
 """
 from argparse import ArgumentParser
 import json
-from re import S
 import pandas as pd
 import torch
 from tqdm import tqdm
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-task = "COPA"
+task = "BoolQ"
 model_name = "tunib/electra-ko-base"
 model = AutoModelForSequenceClassification.from_pretrained(model_name)
 tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -26,17 +25,15 @@ ckpt_name = f"model_save/{model_path_name}.pt"
 model.load_state_dict(torch.load(ckpt_name, map_location="cpu"))
 model.cuda()
 
-eval_data = pd.read_csv("data/COPA/SKT_COPA_Test.tsv", delimiter="\t")
-eval_text, eval_question, eval_1, eval_2 = (
-    eval_data["sentence"].values,
-    eval_data["question"].values,
-    eval_data["1"].values,
-    eval_data["2"].values,
+eval_data = pd.read_csv("data/BoolQ/SKT_BoolQ_Test.tsv", delimiter="\t")
+eval_text, eval_question = (
+    eval_data["Text"].values,
+    eval_data["Question"].values,
 )
 
 dataset = [
-    {"data": t + args.sep_token + q + args.sep_token + f + args.sep_token + s}
-    for t, q, f, s in zip(eval_text, eval_question, eval_1, eval_2)
+    {"data": t + args.sep_token + q}
+    for t, q in zip(eval_text, eval_question)
 ]
 
 submission = []
@@ -61,9 +58,9 @@ with torch.no_grad():
         )
         classification_results = output.logits.argmax(-1)
 
-        submission.append({"idx": idx+1,"label" : classification_results.item()+1})
+        submission.append({"idx": idx+1,"label" : classification_results.item()})
 
-    copa_dic = {"copa" : submission}
+    boolq_dic = {"boolq" : submission}
 
     with open(f"submission/{model_path_name}.json", 'w') as f:
-        json.dump(copa_dic, f, indent= 4)
+        json.dump(boolq_dic, f, indent= 4)
