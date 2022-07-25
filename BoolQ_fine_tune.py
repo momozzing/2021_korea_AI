@@ -9,11 +9,10 @@ import numpy as np
 import random
 import torch
 from torch.utils.data import DataLoader
+from torch.optim import AdamW
+
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
-
-import deepspeed
-from deepspeed.ops.adam import DeepSpeedCPUAdam
 import wandb
 
 #############################################    -> 실험결과 FIX
@@ -31,32 +30,20 @@ task = "BoolQ"
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 model_name = "monologg/koelectra-base-v3-discriminator"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
-# SPECIAL_TOKENS = {
-#     "bos_token": "<bos>",
-#     "eos_token": "<eos>",
-#     "pad_token": "<pad>",
-#     "sep_token": "<seq>"
-#     }
-# SPECIAL_TOKENS_VALUES = ["<bos>", "<eos>", "<pad>", "<seq>"]
-# tokenizer.add_special_tokens(SPECIAL_TOKENS)
 
 model = AutoModelForSequenceClassification.from_pretrained(
     model_name,
     num_labels=2,
 ).cuda()
 
-# model.resize_token_embeddings(len(tokenizer)) 
-
 parser = ArgumentParser()
-parser.add_argument("--deepspeed_config", type=str, default="BoolQ_ds_config.json")
-parser.add_argument("--local_rank", type=int)
 parser.add_argument("--epoch", default=5, type=int)
 parser.add_argument("--batch_size", default=32, type=int)
 parser.add_argument("--sep_token", default=tokenizer.sep_token, type=str)
 args = parser.parse_args()
 
-wandb.init(project="GPT-finetune", name=f"BoolQ-{model_name}-{random_seed}-mono_post")
-train_data = pd.read_csv("data/BoolQ_data/boolq_post_train_data.tsv", delimiter="\t")
+wandb.init(project="2021_Korea_AI", name=f"BoolQ-{model_name}-{random_seed}")
+train_data = pd.read_csv("data/BoolQ/SKT_BoolQ_Train.tsv", delimiter="\t")
 # train_data = train_data[:50000]
 train_text, train_question, train_labels = (
     train_data["Text"].values,
@@ -76,8 +63,8 @@ train_loader = DataLoader(
     pin_memory=True,
 )
 
-eval_data = pd.read_csv("data/BoolQ_data/boolq_post_val_data.tsv", delimiter="\t")
-eval_data = eval_data[:1000]
+eval_data = pd.read_csv("data/BoolQ/SKT_BoolQ_Dev.tsv", delimiter="\t")
+# eval_data = eval_data[:1000]
 eval_text, eval_question, eval_labels = (
     eval_data["Text"].values,
     eval_data["Question"].values,
@@ -96,13 +83,11 @@ eval_loader = DataLoader(
     pin_memory=True,
 )
 
-optimizer = DeepSpeedCPUAdam(
-    lr=3e-5, weight_decay=3e-7, model_params=model.parameters()
+optimizer = AdamW(params=model.parameters(),
+    lr=3e-5, weight_decay=3e-7
 )
 
-engine, optimizer, _, _ = deepspeed.initialize(
-    args=args, model=model, optimizer=optimizer
-)
+
 epochs = 0
 step = 0
 for epoch in range(args.epoch):
@@ -121,17 +106,17 @@ for epoch in range(args.epoch):
 
         input_ids = tokens.input_ids.cuda()
         attention_mask = tokens.attention_mask.cuda()
-        output = engine.forward(
+        output = model.forward(
             input_ids=input_ids,
             attention_mask=attention_mask,
             labels=label
         )
         loss = output.loss
-        engine.backward(loss)
+        loss.backward()
         optimizer.step()
+
         classification_results = output.logits.argmax(-1)
-        # print(classification_results.size(), label.size())   ### size 동일 
-        # print(output.logits)
+
         acc = 0
         for res, lab in zip(classification_results, label):
             if res == lab:
@@ -155,7 +140,7 @@ for epoch in range(args.epoch):
         input_ids = eval_tokens.input_ids.cuda()
         attention_mask = eval_tokens.attention_mask.cuda()
         
-        eval_out = engine.forward(
+        eval_out = model.forward(
             input_ids=input_ids,
             attention_mask=attention_mask,
             labels=eval_label
@@ -187,7 +172,7 @@ for epoch in range(args.epoch):
         wandb.log({"eval_acc": acc / len(eval_classification_results)})
         wandb.log({"epoch": epochs})
         # torch.save(model.state_dict(), f"model_save/{model_name.replace('/', '-')}-{task}-{step}-{epochs}-{random_seed}-v12.pt")
-        torch.save(model.state_dict(), f"model_save/{model_name.replace('/', '-')}-{task}-{epoch}-{random_seed}-mono_post.pt")
+        torch.save(model.state_dict(), f"model_save/{model_name.replace('/', '-')}-{task}-{epoch}-{random_seed}.pt")
 
 
 
