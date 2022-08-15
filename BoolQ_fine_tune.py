@@ -42,7 +42,7 @@ parser.add_argument("--batch_size", default=32, type=int)
 parser.add_argument("--sep_token", default=tokenizer.sep_token, type=str)
 args = parser.parse_args()
 
-# wandb.init(project="2021_Korea_AI", name=f"{task}-{model_name}-{random_seed}")
+wandb.init(project="2021_Korea_AI", name=f"{task}-{model_name}-{random_seed}")
 
 train_data = pd.read_csv("data/BoolQ/SKT_BoolQ_Train.tsv", delimiter="\t")
 train_text, train_question, train_labels = (
