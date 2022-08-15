@@ -97,6 +97,7 @@ optimizer = AdamW(params=model.parameters(), lr=3e-5, weight_decay=3e-7)
 epochs = 0
 for epoch in range(args.epoch):
     model.train()
+    train_acc = 0
     for train in tqdm(train_loader):
         optimizer.zero_grad()
         text, label = train["data"], train["label"].cuda()
@@ -124,14 +125,16 @@ for epoch in range(args.epoch):
         for res, lab in zip(classification_results, label):
             if res == lab:
                 acc += 1
+        train_acc += acc
 
     wandb.log({"loss": loss})
-    wandb.log({"acc": acc / len(classification_results)})
+    wandb.log({"acc": train_acc / len(train_data)})
     print({"loss": loss})
-    print({"acc": acc / len(classification_results)})    
+    print({"acc": train_acc / len(train_data)})
 
     with torch.no_grad():
         model.eval()
+        eval_acc = 0
         for eval in tqdm(eval_loader):
             eval_text, eval_label = eval["data"], eval["label"].cuda()
             eval_tokens = tokenizer(
@@ -156,12 +159,13 @@ for epoch in range(args.epoch):
             for res, lab in zip(eval_classification_results, eval_label):
                 if res == lab:
                     acc += 1
+            eval_acc += acc
 
         wandb.log({"eval_loss": eval_loss})
-        wandb.log({"eval_acc": acc / len(eval_classification_results)})
+        wandb.log({"eval_acc": eval_acc / len(eval_data)})
         wandb.log({"epoch": epoch + 1})
         print({"eval_loss": eval_loss})
-        print({"eval_acc": acc / len(eval_classification_results)})
+        print({"eval_acc": eval_acc / len(eval_data)})
         print({"epoch": epoch + 1})
 
         torch.save(model.state_dict(),f"model_save/{model_name.replace('/', '-')}-{task}-{epoch}.pt")
